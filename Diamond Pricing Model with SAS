@@ -1,0 +1,126 @@
+/* INPUT DATA */
+PROC IMPORT OUT= work.diamond_price1
+            DATAFILE= "~/HaDoan/IE Project/diamond_price1.xls" 
+            DBMS=xls  REPLACE;
+     GETNAMES=yes;
+     MIXED=no;
+RUN;
+
+/* LOESS Curve between price and carat */
+proc sgscatter data=diamond_price1; 
+plot price * carat / loess=(clm); 
+run;
+
+/* SLR between price and carat */
+proc reg data = diamond_price1 plots=(fitplot residualbypredicted rstudentbypredicted residuals qqplot);
+model price = carat;
+ods exclude DiagnosticsPanel; /*suppress uncessary  diagnostic plots*/
+run;
+
+/* Transformation between price and carat */
+
+/* first transformation - logprice */
+data diamond_price1;
+set diamond_price1;
+logprice = log(price); 
+run;
+
+proc reg data = diamond_price1 plots=(fitplot residualbypredicted rstudentbypredicted residuals qqplot);
+model logprice = carat;
+ods exclude DiagnosticsPanel; /*suppress uncessary  diagnostic plots*/
+run;
+
+/* Second Transformation */
+data diamond_price1;
+set diamond_price1;
+sqrtcarat = sqrt(carat); 
+run;
+
+proc reg data = diamond_price1 plots=(fitplot residualbypredicted rstudentbypredicted residuals qqplot);
+model logprice = sqrtcarat;
+ods exclude DiagnosticsPanel; /*suppress uncessary  diagnostic plots*/
+run;
+
+proc sgscatter data = diamond_price1;
+plot logprice * sqrtcarat / group = color  loess;  
+run;
+
+proc sgscatter data = diamond_price1;
+plot logprice * sqrtcarat / group = cb  loess;  
+run;
+
+proc sgscatter data = diamond_price1;
+plot logprice * sqrtcarat / group = clarity  loess;  
+run;
+
+/* PART 3 MULTI LINEAR REGRESSION */
+PROC IMPORT OUT= work.diamond_price2
+            DATAFILE= "~/HaDoan/IE Project/diamond_price2.xls" 
+            DBMS=xls  REPLACE;
+     GETNAMES=yes;
+     MIXED=no;
+RUN;
+
+data diamond_price2;
+set diamond_price2;
+logprice = log(price); 
+sqrtcarat = sqrt(carat); 
+run;
+
+/* CORRELATION MATRIX */
+proc corr data = diamond_price2;
+var logprice sqrtcarat col_D col_E col_F col_G col_H cla_IF cla_VVS1 cla_VVS2 cla_VS1;
+run;
+
+/* SETTING UP MLR */
+/* MLR for carat, color, clarity, and cb */
+proc reg data = diamond_price2 plots=(fitplot residualbypredicted rstudentbypredicted residuals qqplot);
+model logprice = sqrtcarat col_D col_E col_F col_G col_H cla_IF cla_VVS1 cla_VVS2 cla_VS1 cb_GIA cb_IGI/ss1 vif;
+ods exclude DiagnosticsPanel; /*suppress uncessary  diagnostic plots*/
+run;
+
+/* Partial F-test and interaction effect */
+/* MLR for carat and color */
+proc reg data = diamond_price2 plots=(fitplot residualbypredicted rstudentbypredicted residuals qqplot);
+model logprice = sqrtcarat col_D col_E col_F col_G col_H/ss1 vif;
+ods exclude DiagnosticsPanel; /*suppress uncessary  diagnostic plots*/
+run;
+
+data quantile1;
+f=finv(0.95,5,301);
+pf=1-probf(58.27715517,5,301);
+run;
+proc print data=quantile1;
+run;
+
+/* MLR for carat and clarity */
+proc reg data = diamond_price2 plots=(fitplot residualbypredicted rstudentbypredicted residuals qqplot);
+model logprice = sqrtcarat cla_IF cla_VVS1 cla_VVS2 cla_VS1/ss1 vif;
+ods exclude DiagnosticsPanel; /*suppress uncessary  diagnostic plots*/
+run;
+
+data quantile2;
+f=finv(0.95,4,302);
+pf=1-probf(22.46031369,4,302);
+run;
+proc print data=quantile2;
+run;
+
+/* MLR for carat and cb */
+proc reg data = diamond_price2 plots=(fitplot residualbypredicted rstudentbypredicted residuals qqplot);
+model logprice = sqrtcarat cb_GIA cb_IGI/ss1 vif;
+ods exclude DiagnosticsPanel; /*suppress uncessary  diagnostic plots*/
+run;
+
+data quantile3;
+f=finv(0.95,2,304);
+pf=1-probf(1.441012281,2,304);
+run;
+proc print data=quantile3;
+run;
+
+/* Final model */
+proc reg data = diamond_price2 plots=(fitplot residualbypredicted rstudentbypredicted residuals qqplot);
+model logprice = sqrtcarat col_D col_E col_F col_G col_H cla_IF cla_VVS1 cla_VVS2 cla_VS1 /ss1 vif;
+ods exclude DiagnosticsPanel; /*suppress uncessary  diagnostic plots*/
+run;
